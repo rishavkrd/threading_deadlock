@@ -1,5 +1,5 @@
-LDFLAGS += -pthread
-uthread: uthread.o main.o
+LDFLAGS += -pthread 
+uthread: uthread.o main.o 
 uthread.o: uthread.h
 main.o: uthread.h
 clean:
