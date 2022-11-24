@@ -27,6 +27,7 @@ void thread2(void* arg)
 
 int main(int argc, const char** argv)
 {
+    //uthread_set_policy(UTHREAD_PRIORITY);
     uthread_init();
     uthread_create(thread1, NULL);
     uthread_create(thread2, NULL);

@@ -1,8 +1,8 @@
 /* Write your core functionality in this file. */
-//#include <iostream>
+// #include <iostream>
 #include <pthread.h>
 #include "uthread.h"
-
+#include <cstdlib>
 
 // using namespace std;
 struct thread_info{
@@ -35,7 +35,7 @@ public:
 		tail=NULL;
 	}
 	void push(struct thread_info t){
-		Node *temp = new Node;
+		Node *temp = (Node*) malloc(sizeof(Node));
 		temp->val = t;
 		temp->next = NULL;
 		// temp->next = head;
@@ -70,32 +70,24 @@ int index=0;
 int* ret;
 int turn=0;
 LinkedList ready;
-uthread_policy sch_policy;
+uthread_policy sch_policy = UTHREAD_DIRECT_PTHREAD;
 
 
 
 void* handler(void* arg) {
-
     while(true) {
-
         /* Select a user-space thread from the ready queue */
     	struct thread_info t;
-
         /* Take the thread off the ready queue */
     	t = ready.pop();
-
         /* Run the task of the user-space thread */
     	t.func(t.arg);
     	// uthread_yield();
-
     }
-
     return NULL;
-
 }
 
 void uthread_set_policy(enum uthread_policy policy){
-
 	sch_policy = policy;
 	return;
 }
@@ -110,6 +102,7 @@ void uthread_init(void)
 				list[index]=t1;
 				index++;
 			}
+			index=4;
 		}
 	return;
 }
@@ -120,11 +113,13 @@ void uthread_create(void (*func) (void*), void* arg)
 	struct thread_info tinfo;
 	//void* (*func) (void*) f = &func;
 	if(sch_policy == UTHREAD_DIRECT_PTHREAD){
+		//cout << "UTHREAD_DIRECT_PTHREAD";
 		pthread_create(&t1, NULL,(void* (*) (void*)) func, (void*) arg);
 		list[index]=t1;
 		index++;
 	}
 	else if(sch_policy = UTHREAD_PRIORITY){
+		//cout << "UTHREAD_PRIORITY";
 		// ready.push(??);
 			tinfo.id=turn;
 			tinfo.priority=0;

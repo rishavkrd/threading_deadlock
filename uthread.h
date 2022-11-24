@@ -12,7 +12,7 @@ void uthread_cleanup(void);
 
 enum uthread_policy {
     UTHREAD_DIRECT_PTHREAD = 0,
-    UTHREAD_PRIORITY,
+    UTHREAD_PRIORITY = 1,
     /* Add the next policy */
 };
 
