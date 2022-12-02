@@ -16,6 +16,9 @@ struct thread_info{
 	bool running;
 };
 
+struct thread_info* temp5;
+void* stackg;
+
 class Node{
 public:
 	Node *next;
@@ -57,12 +60,12 @@ public:
 		return;
 	}
 	struct thread_info* pop(){
-		struct thread_info t;
-		t.id=-1;
+		temp5 = (struct thread_info *) malloc(sizeof(thread_info *));
+		temp5->id=-1;
 		if(this->head != NULL){
-			t = this->head->val;
+			temp5 = &this->head->val;
 			this->head = head->next;
-			return &t;
+			return temp5;
 		} 
 		
 		return NULL;
@@ -70,32 +73,12 @@ public:
 
 };
 
-// void move_sp(unsigned long addr) {
-
-//     asm volatile (
-
-//     	"mov $addr, %rsp\n\t"
-//     	"mov $addr, %rbp\n\t"
-//     	);
-
-//         // "syscall"                  // Use syscall instruction
-
-//         // : "=a" (ret)               // Return value in RAX
-
-//         // : "0"(SYS_stop_record),   // Syscall numer
-
-//         //   "D"(record_id)           // 1st parameter in RDI (D)
-
-//         // : "rcx", "r11", "memory"); // clobber list (RCX and R11)
-
-// }
-
 
 pthread_t list[1000];
 int index=0;
 int* ret;
 int turn=0;
-LinkedList ready;
+LinkedList *ready = (LinkedList*) malloc(sizeof(LinkedList*));
 uthread_policy sch_policy = UTHREAD_DIRECT_PTHREAD;
 __thread thread_info* current_uthread;
 __thread thread_info* next_uthread;
@@ -104,17 +87,47 @@ __thread thread_info* next_uthread;
 void* handler(void* arg) {
     while(true) {
         /* Select a user-space thread from the ready queue */
-    	while(ready.isEmpty()) printf("ready queue is : %d\n",ready.isEmpty());
+        //printf("ready queue is : %d\n",ready.isEmpty());
+    	while(ready->isEmpty()) ;
         /* Take the thread off the ready queue */
-    	next_uthread = ready.pop();
+    	next_uthread = ready->pop();
+    	printf("next uthread is : %lu\n", (unsigned long)next_uthread);
         /* Run the task of the user-space thread */
         current_uthread = next_uthread;
-        unsigned long a = (unsigned long)(current_uthread->stack) + 4096;
+        printf("current uthread is : %lu\n", (unsigned long)current_uthread);
+        //how to save all the registers of current thread?
+        // __asm__ __volatile__ (
+        // 		// "push %es;"
+        // 		"pushl %rax;"
+        // 		"pushl %ebp;"
+        // 		"pushl %edi;"
+        // 		"pushl %esi;"
+        // 		"pushl %edx;"
+        // 		"pushl %ecx;"
+        // 		"pushl %ebx;"
+        // 		"movl %edx,%ds;"
+        // 		"movl %edx,%ds;"
+        // 		// "push %es;"
+        // 		// "push %es;"
+
+        // 		// "mov %0, %%rbp\n\t;"
+        // 		// : "=r" ( a )
+        // 		);
         // move_sp(a+4096);
         if(next_uthread!=NULL && !next_uthread->running){
-        	__asm__ ("mov %0, %%rsp\n\t;" : "=r"( a ));
-        	__asm__ ("mov %0, %%rbp\n\t;" : "=r"( a ));
+        	unsigned long a = (unsigned long)(current_uthread->stack) + (unsigned long) 4096;
+        	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
+        	printf("stack is : %lu\n", a);
+        	//this is causing segmenatation falut, is there issue with the assembly code or the value of stack pointer?
+        	__asm__ __volatile__ (
+        		"mov %0, %%rsp\n\t;"
+        		"mov %0, %%rbp\n\t;"
+        		: "=r" ( a )
+        		);
+        	//__asm__ ("movl %0, %%rbp\n\t;" : "=r"( a ));
+        	printf("running function in user thread\n");
         	next_uthread->running=true;
+        	
         	current_uthread->func(current_uthread->arg);
         }
         
@@ -168,15 +181,15 @@ void uthread_create(void (*func) (void*), void* arg)
 		// ready.push(??);
 		printf("Added to ready queue \n");
 
-		void* stack = malloc(4096);
-		tinfo.stack = stack;
+		stackg = malloc(4096);
+		tinfo.stack = stackg;
 
 		tinfo.id=turn;
 		tinfo.priority=0;
 		tinfo.func= func;
 		tinfo.arg=arg;
 		tinfo.running=false;
-		ready.push(tinfo);
+		ready->push(tinfo);
 		turn++;
 	}
 	
@@ -197,7 +210,7 @@ void uthread_yield(void)
 void uthread_cleanup(void)
 {
 	/* Wait for all 4 pthreads to exit */
-	for(int i=0;i<=index;i++)
+	for(int i=0;i<index;i++)
 		{
 			pthread_join(list[i],NULL);
 		}
