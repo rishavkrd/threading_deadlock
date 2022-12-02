@@ -1,4 +1,4 @@
-LDFLAGS += -pthread -lstdc++
+LDFLAGS += -pthread -lstdc++ -g -O0 -v -da -Q
 uthread: uthread.o main.o 
 uthread.o: uthread.h
 main.o: uthread.h
