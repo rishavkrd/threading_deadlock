@@ -13,11 +13,13 @@ struct thread_info{
 	int id;
 	int priority;
 	void* stack;
+	void* reg;
 	bool running;
 };
 
 struct thread_info* temp5;
 void* stackg;
+void* regg;
 
 class Node{
 public:
@@ -82,7 +84,7 @@ LinkedList *ready = (LinkedList*) malloc(sizeof(LinkedList*));
 uthread_policy sch_policy = UTHREAD_DIRECT_PTHREAD;
 __thread thread_info* current_uthread;
 __thread thread_info* next_uthread;
-
+unsigned long out=0;
 
 void* handler(void* arg) {
     while(true) {
@@ -96,39 +98,99 @@ void* handler(void* arg) {
         current_uthread = next_uthread;
         printf("current uthread is : %lu\n", (unsigned long)current_uthread);
         //how to save all the registers of current thread?
+        if(next_uthread!=NULL){
+        	 unsigned long b = (unsigned long)(current_uthread->reg) + (unsigned long) 4096;
+        	 printf("storing stack reg at: %lu\n",b);
         // __asm__ __volatile__ (
+        // 		"mov %%rsp, %0\n\t;"
+        // 		"mov %%rbp, %0\n\t;"
+        		
         // 		// "push %es;"
-        // 		"pushl %rax;"
-        // 		"pushl %ebp;"
-        // 		"pushl %edi;"
-        // 		"pushl %esi;"
-        // 		"pushl %edx;"
-        // 		"pushl %ecx;"
-        // 		"pushl %ebx;"
-        // 		"movl %edx,%ds;"
-        // 		"movl %edx,%ds;"
+        // 		"push %%rax;"
+        // 		// "push %ebp;"
+        // 		"push %%rcx;"
+        // 		"push %%rdx;"
+        // 		"push %%rbx;"
+        // 		"push %%rsi;"
+        // 		"push %%rdi;"
+        // 		"push %%rsp;"
+        // 		"push %%rbp;"
+        // 		"push %%r8;"
+        // 		"push %%r9;"
+        // 		"push %%r10;"
+        // 		"push %%r11;"
+        // 		"push %%r12;"
+        // 		"push %%r13;"
+        // 		"push %%r14;"
+        // 		"push %%r15;"
+        // 		// "push %edi;"
+        // 		// "push %esi;"
+        // 		// "push %edx;"
+        // 		// "push %ecx;"
+        // 		// "push %ebx;"
+        // 		// "movl %edx,%ds;"
+        // 		// "movl %edx,%ds;"
         // 		// "push %es;"
         // 		// "push %es;"
 
         // 		// "mov %0, %%rbp\n\t;"
         // 		// : "=r" ( a )
+        // 		:"=r" ( b )
         // 		);
-        // move_sp(a+4096);
+        }
+       
+
+        //move_sp(a+4096);
         if(next_uthread!=NULL && !next_uthread->running){
         	unsigned long a = (unsigned long)(current_uthread->stack) + (unsigned long) 4096;
         	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
-        	printf("stack is : %lu\n", a);
+        	printf("correct order stack is : %lu\n", a);
+        	
         	//this is causing segmenatation falut, is there issue with the assembly code or the value of stack pointer?
+        	// fixed by changing mov order to %%rsp, %0.
         	__asm__ __volatile__ (
-        		"mov %0, %%rsp\n\t;"
-        		"mov %0, %%rbp\n\t;"
-        		: "=r" ( a )
+        		"mov %1, %%rsp\n\t;"
+        		"mov %1, %%rbp \n\t;"
+        		"mov %%rsp, %0"
+        		:"=r" ( out )
+        		:"r" (a)
+        		:"%eax"
         		);
         	//__asm__ ("movl %0, %%rbp\n\t;" : "=r"( a ));
-        	printf("running function in user thread\n");
+        	printf("running function in user thread, out: %d\n",out);
         	next_uthread->running=true;
         	
         	current_uthread->func(current_uthread->arg);
+        } else if(next_uthread!=NULL){
+        	unsigned long b = (unsigned long)(current_uthread->reg) + (unsigned long) 4096;
+        	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
+        	printf("restoring regg : %lu\n", b);
+        	//restoring registers
+        	// __asm__ __volatile__ (
+        	// 	"mov %%rsp, %0\n\t;"
+        	// 	"mov %%rbp, %0\n\t;"
+        		
+        	// 	"pop %%r15;"
+        	// 	// "push %ebp;"
+        	// 	"pop %%r14;"
+        	// 	"pop %%r13;"
+        	// 	"pop %%r12;"
+        	// 	"pop %%r11;"
+        	// 	"pop %%r10;"
+        	// 	"pop %%r9;"
+        	// 	"pop %%r8;"
+        	// 	"pop %%rbp;"
+        	// 	"pop %%rsp;"
+        	// 	"pop %%rdi;"
+        	// 	"pop %%rsi;"
+        	// 	"pop %%rbx;"
+        	// 	"pop %%rdx;"
+        	// 	"push %%rcx;"
+        	// 	"pop %%rax;"
+        	// 	:"=r" (out)
+        	// 	// :"r" ( b )
+        	// 	// :"%eax"
+        	// 	);
         }
         
         // __asm__("addq %1,%2" : "=r" (%rsp) : "r" (a), "0" (4096));
@@ -182,6 +244,8 @@ void uthread_create(void (*func) (void*), void* arg)
 		printf("Added to ready queue \n");
 
 		stackg = malloc(4096);
+		regg = malloc (4096);
+		tinfo.reg = regg;
 		tinfo.stack = stackg;
 
 		tinfo.id=turn;
