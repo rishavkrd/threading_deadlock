@@ -5,7 +5,7 @@
 
 void foo (void* arg) {
     for (size_t i = 0; i < 10; ++i) {
-        //printf("Thread %lu\n", (unsigned long)arg);
+        printf("Thread %lu, i: %lu\n", (unsigned long)arg, (unsigned long ) i);
         usleep(1000);
     }
     printf("\e[34m# Thread %lu done.\e[0m\n", (unsigned long)arg);
@@ -15,6 +15,7 @@ void foo (void* arg) {
 void bar (void* arg) {
     uthread_set_param((unsigned long)arg);
     for (size_t i = 0; i < 10; ++i) {
+        printf("Thread %lu, i: %lu\n", (unsigned long)arg, (unsigned long ) i);
         usleep(1000);
         uthread_yield();
     }
@@ -70,17 +71,17 @@ int main(int argc, const char** argv)
             puts("\e[34m# Test 5: Task 2, trying priority stuff. Expect threads 0-3 to finish first then threads 4-7.\e[0m");
             uthread_set_policy(UTHREAD_PRIORITY);
             uthread_init();
-            // for (size_t i = 0; i < 8; i++) {
-            //     uthread_create(bar, (void*)i);
-            // }
-            uthread_create(bar, (void*)1);
-            uthread_create(bar, (void*)2);
-            uthread_create(bar, (void*)3);
-            uthread_create(bar, (void*)4);
-            uthread_create(bar, (void*)5);
-            uthread_create(bar, (void*)6);
-            uthread_create(bar, (void*)7);
-            uthread_create(bar, (void*)8);
+            for (size_t i = 0; i < 9; i++) {
+                uthread_create(bar, (void*)i);
+            }
+            // uthread_create(bar, (void*)1);
+            // uthread_create(bar, (void*)2);
+            // uthread_create(bar, (void*)3);
+            // uthread_create(bar, (void*)4);
+            // uthread_create(bar, (void*)5);
+            // uthread_create(bar, (void*)6);
+            // uthread_create(bar, (void*)7);
+            // uthread_create(bar, (void*)8);
             uthread_cleanup();
             break;
         default:
