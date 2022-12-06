@@ -13,15 +13,15 @@ struct thread_info{
 	int id;
 	int priority;
 	void* stack;
-	void* reg;
+	//void* reg;
 	void* reg_th;
 	bool running;
 	unsigned long sch_rsp;
+	unsigned long thread_rsp;
 };
 
 struct thread_info* temp5;
 void* stackg;
-void* regg;
 void* regt;
 
 class Node{
@@ -55,6 +55,7 @@ public:
 		temp->next = NULL;
 		// temp->next = head;
 		// this->head = temp;
+		// printf("Thread %lu pushed to ready queue\n",(unsigned long)t.arg);
 		if(this->head==NULL){
 			head=temp;
 			tail=temp;
@@ -91,13 +92,15 @@ unsigned long out=0;
 // int cln = 0;
 // int *cleanup = (int*) malloc(sizeof(int*));
 bool cleanup = false;
+unsigned long rsp1, rbp1;
 
 
 void* handler(void* arg) {
+	bool yielded = false;
     while(!cleanup || !ready->isEmpty()) {
         /* Select a user-space thread from the ready queue */
         //if(*cleanup==1) return NULL;
-        printf("ready queue is : %d\n",ready->isEmpty());
+        // printf("ready queue is : %d\n",ready->isEmpty());
 
     	while(ready->isEmpty() && !cleanup) ;
         /* Take the thread off the ready queue */
@@ -105,178 +108,150 @@ void* handler(void* arg) {
     	//printf("next uthread is : %lu\n", (unsigned long)next_uthread);
         /* Run the task of the user-space thread */
         current_uthread = next_uthread;
-        printf("current uthread is : %lu\n", (unsigned long)current_uthread);
+        //printf("current uthread is : %lu\n", (unsigned long)current_uthread);
         //how to save all the registers of current thread?
-        //saving scheduler registers
+        
         if(next_uthread!=NULL){
-        	 unsigned long b = (unsigned long)(current_uthread->reg) + (unsigned long) 4096;
+        	//saving scheduler registers
         	 //printf("pushing scheduler register to stack at: %lu\n",b);
-        __asm__ __volatile__ (
-        		// "mov %1, %%rsp\n\t;"
-        		
-        		
-        		
-        			// "push %es;"
-        		"push %%rax;"
-        		
-        		// // "push %ebp;"
-        		"push %%rcx;"
-        		"push %%rdx;"
-        		"push %%rbx;"
-        		"push %%rsi;"
-        		"push %%rdi;"
-        		"push %%rsp;"
-        		"push %%rbp;"
-        		"push %%r8;"
-        		"push %%r9;"
-        		"push %%r10;"
-        		"push %%r11;"
-        		"push %%r12;"
-        		"push %%r13;"
-        		"push %%r14;"
-        		"push %%r15;"
-        		// "push %edi;"
-        		// "push %esi;"
-        		// "push %edx;"
-        		// "push %ecx;"
-        		// "push %ebx;"
-        		// "movl %edx,%ds;"
-        		// "movl %edx,%ds;"
-        		// "push %es;"
-        		// "push %es;"
-
-        		// "mov %0, %%rbp\n\t;"
-        		"mov %%rsp, %0"
-        		:"=r" ( current_uthread->sch_rsp )
-        		:"r" (b)
-        		:"%eax"
-        		);
+        
         	//printf("pushed scheduler registers, rsp: %lu\n",current_uthread->sch_rsp);
-        	
         }
-       
 
         //move_sp(a+4096);
         if(next_uthread!=NULL && !next_uthread->running){
         	current_uthread->running=true;
         	unsigned long a = (unsigned long)(current_uthread->stack) + (unsigned long) 4096;
-        	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
-        	//printf("moving to thread stack is : %lu\n", a);
-        	//void* pass = current_uthread->arg;
+        	//printf("moving to thread stack : %lu\n", a);
         	//printf("\x1B[36m arg: %lu \e[0m\n", (unsigned long) current_uthread->arg);
-        	//this is causing segmenatation falut, is there issue with the assembly code or the value of stack pointer?
-        	// fixed by changing mov order to %%rsp, %0.
-        	__asm__ __volatile__ (
-        		"mov %1, %%rsp\n\t;"
-        		"mov %1, %%rbp \n\t;"
-        		"mov %%rbp, %0"
-        		:"=r" ( out )
-        		:"r" (a)
-        		// :"%eax"
-        		);
 
-        	__asm__ __volatile__ (
-        		// "push %%rbp\n"
-        		"push %2\n"
-        		"call *%1\n"
-        		//"movq %1, %%rdi"
-        		// "mov %0, %1"
-        		// "pop %0\n"
-        		:"=r" ( out )
-        		:"0" ( current_uthread->func ),
-        		"D" ((unsigned long) current_uthread->arg)
-        		// :"%eax"
-        		);
-        	//printf("\x1B[36m out arg: %lu \e[0m\n", (unsigned long) out);
         	// __asm__ __volatile__ (
-        	// 	"call *%1\n"
-        	// 	"add $32, %%rsp\n"
-        		
+        	// 	"mov %1, %%rsp\n\t;"
+        	// 	"mov %1, %%rbp \n\t;"
+        	// 	"mov %%rbp, %0"
         	// 	:"=r" ( out )
-        	// 	:"r" (current_uthread->func)
+        	// 	:"r" (a)
         	// 	// :"%eax"
         	// 	);
 
-        	//__asm__ ("movl %0, %%rbp\n\t;" : "=r"( a ));
-        	//printf("assembly running function in user thread\n");
-        	//current_uthread->func(current_uthread->arg);
-        } 
-        // else if(next_uthread!=NULL){
-        // 	unsigned long b = (unsigned long)(current_uthread->reg) + (unsigned long) 4096;		//4096-16 bytes for 16 registers
-        // 	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
-        // 	printf("restoring regg : %lu\n", b);
-        // 	//restoring registers
-        // 	__asm__ __volatile__ (
-        // 		"mov %1, %%rsp\n\t;"
-        // 		"mov %1, %%rbp \n\t;"
-        		
-        // 		"pop %%r15;"
-        // 		// "push %ebp;"
-        // 		"pop %%r14;"
-        // 		"pop %%r13;"
-        // 		"pop %%r12;"
-        // 		"pop %%r11;"
-        // 		"pop %%r10;"
-        // 		"pop %%r9;"
-        // 		"pop %%r8;"
-        // 		"pop %%rbp;"
-        // 		"pop %%rsp;"
-        // 		"pop %%rdi;"
-        // 		"pop %%rsi;"
-        // 		"pop %%rbx;"
-        // 		"pop %%rdx;"
-        // 		"push %%rcx;"
-        // 		"pop %%rax;"
-        // 		"mov %%rax, %0"
-        // 		:"=r" (out)
-        // 		:"r" ( b )
-        // 		:"%eax"
-        // 		);
-        // 	printf("popping in user thread, out: %lu\n",out);
-        // }
-        if(current_uthread!=NULL){
-	        //restoring scheduler registers
-	    	unsigned long b = (unsigned long)(current_uthread->reg) + (unsigned long) 4032; //3968;		//4096-64 = 4080 bytes for 16 registers
-	    	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
-	    	printf("restoring scheduler reg from : %lu\n", current_uthread->sch_rsp);
-	    	//restoring registers
-	    	__asm__ __volatile__ (
-	    		"mov %1, %%rsp\n\t;"
-	    		
-	    		
-	    		"pop %%r15;"
-	    		// "push %ebp;"
-	    		"pop %%r14;"
-	    		"pop %%r13;"
-	    		"pop %%r12;"
-	    		"pop %%r11;"
-	    		"pop %%r10;"
-	    		"pop %%r9;"
-	    		"pop %%r8;"
-	    		"pop %%rbp;"
-	    		"pop %%rsp;"
-	    		"pop %%rdi;"
-	    		"pop %%rsi;"
-	    		"pop %%rbx;"
-	    		"pop %%rdx;"
-	    		"push %%rcx;"
-	    		"pop %%rax;"
-	    		"mov %%rbp, %0"
-	    		:"=r" (out)
-	    		:"r" ( current_uthread->sch_rsp )
-	    		:"%eax"
-	    		);
-	    	//printf("popping back scheduler registers, rbp: %lu\n",out);
-	    	// printf("\x1B[36m arg: %lu \e[0m\n", (unsigned long)current_uthread->arg);
-	    }
-        
-        
-        // __asm__("addq %1,%2" : "=r" (%rsp) : "r" (a), "0" (4096));
-        // __asm__("addq %1,%2" : "=r" (%rbp) : "r" (a), "0" (4096));
-        //     	"mov %1, %%rbp\n\t"
 
-    	
-    	// uthread_yield();
+        	__asm__ __volatile__ (
+        		// "push %%rbp\n"
+        		// "push %2\n"
+        		"mov %%rsp, %%r15\n\t;"
+        		"mov %%rbp, %%r14 \n\t;"
+
+        		"mov %3, %%rsp\n\t;"
+        		"mov %3, %%rbp \n\t;"
+        		"call *%1\n"
+        		"mov %%r15, %%rsp\n\t;"
+        		"mov %%r14, %%rbp \n\t;"
+        		//"mov %%rax, %0"
+        		:"=a" ( out )		//0
+        		:"0" ( current_uthread->func ),	//1
+        		"D" ((unsigned long) current_uthread->arg),	//2
+        		"S"(a)	//3
+        		// :"%eax"
+        		);
+        	printf("\x1B[36m returned from thread \e[0m\n");
+        	// printf("\x1B[36m return value of thread is: %lu \e[0m\n", (unsigned long) out);
+        	//printf("assembly running function in user thread\n");
+
+        } 
+        else if(next_uthread!=NULL && next_uthread->running ){
+        	//restoring thread's stack for previously yielded thread.
+        	yielded = true;
+        	//unsigned long thread_stack_bottom = (unsigned long)(current_uthread->stack) + (unsigned long) (4096-128+48);		//4096-128 bytes for 16 registers
+        	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
+        	//printf("restoring previously yielded thread's stack : %lu\n", current_uthread->thread_rsp);
+        	//restoring thread registers
+        	__asm__ __volatile__ (
+        		"mov %%rsp, %%r15;"
+        		"mov %%rbp, %%r14;"
+        		"mov %1, %%rsp\n\t"
+        		//"mov %1, %%rbp \n\t;"
+        		
+        		"pop %%r13;"
+        		// "push %ebp;"
+        		"pop %%r13;"
+        		"pop %%r13;"
+        		"pop %%r12;"
+        		"pop %%r11;"
+        		"pop %%r10;"
+        		"pop %%r9;"
+        		"pop %%r8;"
+        		"pop %%rbp;"
+        		"pop %%rsp;"
+        		"pop %%rdi;"
+        		"pop %%rsi;"
+        		"pop %%rbx;"
+        		"pop %%rdx;"
+        		"push %%rcx;"
+        		"pop %%rax;"
+        		// "mov %%rsp, %0;"
+        		"mov %%r15, %%rsp;"
+        		"mov %%r14, %%rbp;"
+        		:"=r" (out)
+        		:"r" ( current_uthread->thread_rsp )
+        		:"%eax"
+        		);
+        	//printf("\x1B[32m restored previously yielded thread's stack succesfully, calling function \e[0m\n");
+        	// __asm__ __volatile__ (
+        	// 	// "push %%rbp\n"
+        	// 	// "push %2\n"
+        	// 	"call *%1\n"
+        	// 	//"mov %%rax, %0"
+        	// 	:"=a" ( out )		//0
+        	// 	:"0" ( current_uthread->func )//,	//1
+        	// 	// "D" ((unsigned long) current_uthread->arg)	//2
+        	// 	// :"%eax"
+        	// 	);
+        	
+
+        	// printf("\x1B[32m Done succesfully continued the thread and completed context switch  \e[0m\n");
+        	
+
+        	//printf("popping thread's registers rsp is at: %lu\n",out);
+        }
+     //    else if(current_uthread!=NULL && !yielded){
+	    //     //restoring scheduler registers
+	    // 	//unsigned long b = (unsigned long)(current_uthread->reg) + (unsigned long) 4032; //3968;		//4096-64 = 4080 bytes for 16 registers
+	    // 	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
+	    // 	printf("Handler is restoring scheduler back from reg from : %lu\n", current_uthread->sch_rsp);
+	    // 	//restoring registers
+	    // 	__asm__ __volatile__ (
+	    // 		"mov %1, %%rsp\n\t;"
+	    		
+	    		
+	    // 		"pop %%r15;"
+	    // 		// "push %ebp;"
+	    // 		"pop %%r14;"
+	    // 		"pop %%r13;"
+	    // 		"pop %%r12;"
+	    // 		"pop %%r11;"
+	    // 		"pop %%r10;"
+	    // 		"pop %%r9;"
+	    // 		"pop %%r8;"
+	    // 		"pop %%rbp;"
+	    // 		"pop %%rsp;"
+	    // 		"pop %%rdi;"
+	    // 		"pop %%rsi;"
+	    // 		"pop %%rbx;"
+	    // 		"pop %%rdx;"
+	    // 		"push %%rcx;"
+	    // 		"pop %%rax;"
+	    // 		"mov %%rbp, %0"
+	    // 		:"=r" (out)
+	    // 		:"r" ( current_uthread->sch_rsp )
+	    // 		:"%eax"
+	    // 		);
+
+	    // 	//if(yielded) ready->push(*current_uthread);
+	    // 	yielded=false;
+	    // 	//printf("popping back scheduler registers, rbp: %lu\n",out);
+	    // 	// printf("\x1B[36m arg: %lu \e[0m\n", (unsigned long)current_uthread->arg);
+	    // }
+        
 
     }
     return NULL;
@@ -323,11 +298,11 @@ void uthread_create(void (*func) (void*), void* arg)
 		//printf("Added to ready queue \n");
 
 		stackg = malloc(4096);
-		regg = malloc (4096);
+		//regg = malloc (4096);
 		regt = malloc(4096);
 
 		tinfo.reg_th = regt;
-		tinfo.reg = regg;
+		//tinfo.reg = regg;
 		tinfo.stack = stackg;
 
 		tinfo.id=turn;
@@ -355,7 +330,78 @@ void uthread_exit(void)
 
 void uthread_yield(void)
 {
-	pthread_yield();
+	if(sch_policy == UTHREAD_DIRECT_PTHREAD){
+		printf("yielded the thread, UTHREAD_DIRECT_PTHREAD\n");
+		pthread_yield();
+
+	}
+	else if (sch_policy == UTHREAD_PRIORITY){
+		unsigned long thread_stack_top = (unsigned long)(current_uthread->stack) + (unsigned long) (4096);
+		__asm__ __volatile__ (
+					// "mov %%rsp, %%r11\n"
+	        		// "mov %1, %%rsp\n\t;"
+	        		"push %%rax;"
+	        		// // "push %ebp;"
+	        		"push %%rcx;"
+	        		"push %%rdx;"
+	        		"push %%rbx;"
+	        		"push %%rsi;"
+	        		"push %%rdi;"
+	        		"push %%rsp;"
+	        		"push %%rbp;"
+	        		"push %%r8;"
+	        		"push %%r9;"
+	        		"push %%r10;"
+	        		"push %%r11;"
+	        		"push %%r12;"
+	        		"push %%r13;"
+	        		"push %%r14;"
+	        		"push %%r15;"
+	        		"mov %%rsp, %0;"
+	        		// "mov %%r11, %%rsp\n\t;"
+	        		:"=r" ( current_uthread->thread_rsp )
+	        		:"r" ( thread_stack_top )
+	        		);
+		
+		//yielded = true;
+		
+		//printf("yielded the user thread, pushed thread's register and rsp at: current_uthread->thread_rsp: %lu\n",current_uthread->thread_rsp);
+
+		// printf("yield function is restoring scheduler reg from : %lu\n", current_uthread->sch_rsp);
+		//     	//restoring registers
+		//     	__asm__ __volatile__ (
+		//     		"mov %1, %%rsp\n\t;"
+		    		
+		    		
+		//     		"pop %%r15;"
+		//     		// "push %ebp;"
+		//     		"pop %%r14;"
+		//     		"pop %%r13;"
+		//     		"pop %%r12;"
+		//     		"pop %%r11;"
+		//     		"pop %%r10;"
+		//     		"pop %%r9;"
+		//     		"pop %%r8;"
+		//     		"pop %%rbp;"
+		//     		"pop %%rsp;"
+		//     		"pop %%rdi;"
+		//     		"pop %%rsi;"
+		//     		"pop %%rbx;"
+		//     		"pop %%rdx;"
+		//     		"push %%rcx;"
+		//     		"pop %%rax;"
+		//     		"mov %%rbp, %0"
+		//     		:"=r" (out)
+		//     		:"r" ( current_uthread->sch_rsp )
+		//     		:"%eax"
+		//     		);
+		ready->push(*current_uthread);
+		//current_uthread = ready->pop();
+		return;
+		//current_uthread = ready->pop();
+		//pthread_yield();
+	}
+	
 }
 
 void uthread_cleanup(void)
