@@ -62,7 +62,7 @@ int main(int argc, const char** argv)
             puts("\e[34m# Test 4: Task 2, Testing more uthreads than pthreads.\e[0m");
             uthread_set_policy(UTHREAD_PRIORITY);
             uthread_init();
-            for (size_t i = 0; i < 5; i++) {
+            for (size_t i = 0; i < 7; i++) {
                 uthread_create(foo, (void*)i);
             }
             uthread_cleanup();
@@ -71,7 +71,7 @@ int main(int argc, const char** argv)
             puts("\e[34m# Test 5: Task 2, trying priority stuff. Expect threads 0-3 to finish first then threads 4-7.\e[0m");
             uthread_set_policy(UTHREAD_PRIORITY);
             uthread_init();
-            for (size_t i = 0; i < 9; i++) {
+            for (size_t i = 0; i < 10; i++) {
                 uthread_create(bar, (void*)i);
             }
             // uthread_create(bar, (void*)1);
@@ -82,6 +82,15 @@ int main(int argc, const char** argv)
             // uthread_create(bar, (void*)6);
             // uthread_create(bar, (void*)7);
             // uthread_create(bar, (void*)8);
+            uthread_cleanup();
+            break;
+        case 6:
+            puts("\e[34m# Test 5: Task 2, trying priority stuff. Expect threads 0-3 to finish first then threads 4-7.\e[0m");
+            uthread_set_policy(UTHREAD_PRIORITY);
+            uthread_init();
+            for (size_t i = 0; i < 10; i++) {
+                uthread_create(bar, (void*)(9-i));
+            }
             uthread_cleanup();
             break;
         default:
