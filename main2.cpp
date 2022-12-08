@@ -17,10 +17,10 @@ void bar (void* arg) {
     for (size_t i = 0; i < 10; ++i) {
         
         usleep(1000);
-        uthread_yield();
         printf("Thread %lu, i: %lu\n", (unsigned long)arg, (unsigned long ) i);
+        uthread_yield();
     }
-    printf("\e[34m# Thread %lu done.\e[0m\n", (unsigned long)arg);
+    printf("\n\e[34m #Thread %lu done.\e[0m\n", (unsigned long)arg);
     uthread_exit();
 }
 
@@ -72,7 +72,7 @@ int main(int argc, const char** argv)
             puts("\e[34m# Test 5: Task 2, trying priority stuff. Expect threads 0-3 to finish first then threads 4-7.\e[0m");
             uthread_set_policy(UTHREAD_PRIORITY);
             uthread_init();
-            for (size_t i = 0; i < 10; i++) {
+            for (size_t i = 0; i < 9; i++) {
                 uthread_create(bar, (void*)i);
             }
             // uthread_create(bar, (void*)1);
@@ -98,5 +98,6 @@ int main(int argc, const char** argv)
             puts("Invalid test number");
             break;
     }
+    puts("\e[34m# !!****!!!! Congratulations  !!!!***!! .\e[0m");
     return 0;
 }

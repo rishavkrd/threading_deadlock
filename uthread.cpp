@@ -150,17 +150,18 @@ void* handler(void* arg) {
         //if(*cleanup==1) return NULL;
         // printf("ready queue is : %d\n",ready->isEmpty());
 		// printf("ready \n");	
-    	ready->print_list();
+    	// ready->print_list();
     	while(ready->isEmpty() && !cleanup) ;
         /* Take the thread off the ready queue */
     	next_uthread = ready->pop();
     	// printf("next uthread is : %lu\n", (unsigned long)next_uthread);
         /* Run the task of the user-space thread */
         current_uthread = next_uthread;
-        printf("current uthread is : %lu\n", (unsigned long)current_uthread);
+        
         //how to save all the registers of current thread?
         
         if(current_uthread!=NULL){
+        	printf("current uthread is : %lu\n", (unsigned long) current_uthread->arg);
         	//saving scheduler registers
         	 //printf("pushing scheduler register to stack at: %lu\n",b);
         	__asm__ __volatile__ (
@@ -191,7 +192,9 @@ void* handler(void* arg) {
         	current_uthread->running=true;
         	unsigned long a = (unsigned long)(current_uthread->stack) + (unsigned long) 4096;
         	//printf("moving to thread stack : %lu\n", a);
-        	printf("\x1B[36m arg: %lu \e[0m\n", (unsigned long) current_uthread->arg);
+        	// printf("\x1B[36m arg: %lu \e[0m\n", (unsigned long) current_uthread->arg);
+        	printf("\x1B[36m @@@@@@First switch to THREAD # %lu, from : %lu \e[0m\n", (unsigned long)current_uthread->arg,(unsigned long)current_uthread->thread_rsp);
+        	
         	__asm__ __volatile__ (
         		// "push %%rbp\n"
         		// "push %2\n"
@@ -222,10 +225,14 @@ void* handler(void* arg) {
         else if(current_uthread!=NULL && current_uthread->running ){
         	//restoring thread's stack for previously yielded thread.
         	// yielded = true;
-        	current_uthread->yield=true;
+        	
+        	//***** yield function *****
+        	// current_uthread->yield=true;
+
         	//unsigned long thread_stack_bottom = (unsigned long)(current_uthread->stack) + (unsigned long) (4096-128+48);		//4096-128 bytes for 16 registers
-        	//size_t a = (size_t)current_uthread->stack + (size_t)4096;
-        	printf("restoring previously yielded thread's stack, jumping back to : %lu\n", (unsigned long)current_uthread->ptr);
+        	size_t a = (size_t)current_uthread->stack + (size_t)4096;
+        	printf("\x1B[36m @@@@@@Running switch to THREAD # %lu, from : %lu \e[0m\n", (unsigned long)current_uthread->arg,(unsigned long)current_uthread->thread_rsp);
+        	// printf("\x1B[36m @@@@@@yield switch to SCHEDULER %lu \e[0m\n");
         	//restoring thread registers
         	__asm__ __volatile__ (
         		// "mov %%rsp, %%r15;"
@@ -244,21 +251,23 @@ void* handler(void* arg) {
 
         		"mov %%rsp, %%r10;"
         		"mov %%rbp, %%r11;"
-        		
-        		"call *%1;"
-
-        		"mov %%r15, %%rsp;"
-        		"mov %%r14, %%rbp;"
+        		// "mov %4, %%rsp;"
+        		// "call *%1;"
+        		// "ret;"
+        		// "mov %%r15, %%rsp;"
+        		// "mov %%r14, %%rbp;"
         		:"=a" (out)
-        		:"0" ( uthread_yield ), //current_uthread->ptr ),//current_uthread->func ),//1
+        		:"0" ( uthread_yield ),//current_uthread->ptr ),//current_uthread->func ),//1
         		"D" ( (unsigned long) current_uthread->arg ),	//2
-        		"S" (current_uthread->thread_rsp)	//3
+        		"S" (current_uthread->thread_rsp),	//3
+        		"r" (a)
         		// :"%eax"
         		);
-        	printf("\x1B[32m restored previously yielded thread's stack succesfully, calling function \e[0m\n");
+        	printf("\x1B[32m restored previously yielded thread's stack succesfully \e[0m\n");
         }
-        printf("\x1B[32m Exiting Core threads \e[0m\n");
+        
     }
+    printf("\x1B[32m Exiting Core threads \e[0m\n");
     return NULL;
 }
 
@@ -340,27 +349,12 @@ void uthread_yield(void)
 	}
 	else if (sch_policy == UTHREAD_PRIORITY){
 
-		if(current_uthread->yield ){
-			current_uthread->yield = false;
-
-			// __asm__ __volatile__ (
-        		
-   //      		"mov %%r10, %%rsp;"
-   //      		"mov %%r11, %%rbp;"
-   //      		:"=a" (out)
-   //      		:"0" ( uthread_yield ), //current_uthread->ptr ),//current_uthread->func ),//1
-   //      		"D" ( (unsigned long) current_uthread->arg ),	//2
-   //      		"S" (current_uthread->thread_rsp)	//3
-   //      		// :"%eax"
-   //      		);
-
-			printf("@return yield\n");
-			return;
-		}
-		current_uthread->ptr = (void *)__builtin_return_address(0);
+		// current_uthread->ptr = (void *)__builtin_return_address(0);
 		// unsigned long thread_stack_top = (unsigned long)(current_uthread->stack) + (unsigned long) (4096);
-		__asm__ __volatile__ (
 
+		__asm__ __volatile__ (
+					// "pop %%rax;"
+					// "ret;"
 	        		"push %%rcx;"
 	        		"push %%rdx;" // Dirty
 	        		"push %%rbx;"
@@ -373,6 +367,7 @@ void uthread_yield(void)
 
 	        "mov %%r15, %%rsp;"
 	        "mov %%r14, %%rbp;"
+
 	        		// "mov %%r11, %%rsp\n\t;"
 	        		:"=r" ( current_uthread->thread_rsp )
 	        		:"r" ( out ),
@@ -382,48 +377,54 @@ void uthread_yield(void)
 		
 		//yielded = true;
 		
-		//printf("yielded the user thread, pushed thread's register and rsp at: current_uthread->thread_rsp: %lu\n",current_uthread->thread_rsp);
+		printf("yielded the user thread # %lu, pushed at: current_uthread->thread_rsp: %lu\n",(unsigned long) current_uthread->arg,current_uthread->thread_rsp);
+		if(!current_uthread->yield){
+			
+			struct Node* pos = ready->peek();
+			struct Node* prev = NULL;
+			bool skip=false;
+			//For priority based scheduling
+			// printf("@yield: current_uthread->priority : %d \n",current_uthread->priority);
+			while(pos!=NULL && pos->val.priority <= current_uthread->priority){
+				if(pos->val.id == current_uthread->id){
+					skip=true;
+					break;
+				} 
+				// printf("@itr:  : %d ",pos->val.priority);
+				prev = pos;
+				pos=pos->next;
+			}
+			// printf("\n");
+			if(!skip) ready->insert(prev, *current_uthread);
+			
+			//ready->push(*current_uthread);		//For FCFS scheduling
 
-		
-		struct Node* pos = ready->peek();
-		struct Node* prev = NULL;
-		bool skip=false;
-		//For priority based scheduling
-		// printf("@yield: current_uthread->priority : %d \n",current_uthread->priority);
-		while(pos!=NULL && pos->val.priority <= current_uthread->priority){
-			if(pos->val.id == current_uthread->id){
-				skip=true;
-				break;
-			} 
-			// printf("@itr:  : %d ",pos->val.priority);
-			prev = pos;
-			pos=pos->next;
+			// next_uthread = ready->pop();
+			
+			
+			printf("\x1B[36m @@@@@@yield switch to SCHEDULER  \e[0m\n");//current_uthread->sch_rsp);
+			
+			    	//restoring registers
+			    	__asm__ __volatile__ (
+			    		// "mov %1, %%rsp\n\t;"
+			    		// "mov %3, %%rbp\n\t;"
+			    		
+			    		// "mov %%rsp, %0;"
+			    		// "mov %%r14, %%rbp;"
+			    		// "mov %%r15, %%rsp;"
+			    		"call *%2;"
+			    		:"=r" (out)
+			    		:"r" ( current_uthread->sch_rsp ),
+			    		"D" (handler),
+			    		"S" (current_uthread->sch_rbp)
+			    		:"%eax"
+			    		);
 		}
-		// printf("\n");
-		if(!skip) ready->insert(prev, *current_uthread);
-		
-		//ready->push(*current_uthread);		//For FCFS scheduling
-
-		next_uthread = ready->pop();
-		
-		
-		printf("yield function is restoring scheduler reg, return ptr : %lu\n", (unsigned long) current_uthread->ptr);//current_uthread->sch_rsp);
-		
-		    	//restoring registers
-		    	__asm__ __volatile__ (
-		    		// "mov %1, %%rsp\n\t;"
-		    		// "mov %3, %%rbp\n\t;"
-		    		
-		    		// "mov %%rsp, %0;"
-		    		// "mov %%r14, %%rbp;"
-		    		// "mov %%r15, %%rsp;"
-		    		"call *%2;"
-		    		:"=r" (out)
-		    		:"r" ( current_uthread->sch_rsp ),
-		    		"D" (handler),
-		    		"S" (current_uthread->sch_rbp)
-		    		:"%eax"
-		    		);
+	    else{
+	    	current_uthread->yield=false;
+	    	printf("@yield returning from yield\n");
+	    	return;
+	    }
 		    	
 		// return;
 		//current_uthread = ready->pop();
