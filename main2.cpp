@@ -15,9 +15,10 @@ void foo (void* arg) {
 void bar (void* arg) {
     uthread_set_param((unsigned long)arg);
     for (size_t i = 0; i < 10; ++i) {
-        printf("Thread %lu, i: %lu\n", (unsigned long)arg, (unsigned long ) i);
+        
         usleep(1000);
         uthread_yield();
+        printf("Thread %lu, i: %lu\n", (unsigned long)arg, (unsigned long ) i);
     }
     printf("\e[34m# Thread %lu done.\e[0m\n", (unsigned long)arg);
     uthread_exit();
