@@ -17,10 +17,10 @@ void bar (void* arg) {
     for (size_t i = 0; i < 10; ++i) {
         
         usleep(1000);
-        printf("Thread %lu, i: %lu\n", (unsigned long)arg, (unsigned long ) i);
+        // printf("Thread %lu, i: %lu\n", (unsigned long)arg, (unsigned long ) i);
         uthread_yield();
     }
-    printf("\n\e[34m #Thread %lu done.\e[0m\n", (unsigned long)arg);
+    printf("\e[34m #Thread %lu done.\e[0m\n", (unsigned long)arg);
     uthread_exit();
 }
 
