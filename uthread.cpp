@@ -204,7 +204,7 @@ uthread_policy sch_policy = UTHREAD_DIRECT_PTHREAD;
 __thread thread_info* current_uthread;
 __thread thread_info* next_uthread;
 
-unsigned long out=0, stack_size=64;
+unsigned long out=0, stack_size=80;
 // int cln = 0;
 // int *cleanup = (int*) malloc(sizeof(int*));
 bool cleanup = false;
@@ -221,7 +221,7 @@ void* handler(void* arg) {
 	unsigned long ret;
 	unsigned long rip_sch = (unsigned long)  &&sch_ret;
 	__asm__ __volatile__ (
-		"mov %%rsp, %%r14;"
+		"mov %%rsp, %%r13;"
 		"mov %1, %%rsp;"
 
 		"push %%r14;"
@@ -232,6 +232,8 @@ void* handler(void* arg) {
 		"push %%rsi;"
 		"push %%rdi;"
 		"push %%rbp;"
+		"push %%rsi;"
+		"push %%rdi;"
 		// "push %%r8;"
 		// "push %%r9;"
 		// "push %%r10;"
@@ -241,7 +243,7 @@ void* handler(void* arg) {
 		// "push %%r14;"
 		// "push %%r15;"
 		"mov %%rsp, %0;"
-		"mov %%r14, %%rsp;"
+		"mov %%r13, %%rsp;"
 		// "jmp *%2;"
 		:"=r" ( ret )
 		:"r" (sch_stack),
@@ -274,9 +276,9 @@ void* handler(void* arg) {
 	// 			:"=r" ( out )
 	// 			:"r" (kernel_bottom)
 	// 			);
-
+sch_ret:
     while(!cleanup || !ready->isEmpty()) {
-    	sch_ret:
+    	
 	// printf("sch_bottom: %lu kernel_bottom: %lu, kernel_stack: %lu\n", ret, kernel_bottom, (unsigned long) kernel_stack);
         /* Select a user-space thread from the ready queue */
     	// ready->print_list();
@@ -313,45 +315,14 @@ void* handler(void* arg) {
         		"mov %%r15, %%rsp;"
         		"mov %%r14, %%rbp;"
 
-        		:"=a" ( out )		//0
-        		:"0" ( current_uthread->func ),	//1
+        		:"=r" ( out )		//0
+        		:"r" ( current_uthread->func ),	//1
         		"D" ((unsigned long) current_uthread->arg),	//2
         		"S" (a)	//3
         		);
         	
         	printf("\x1B[36m **1** First time call complete! \e[0m\n");
-        	// restore_regs(current_uthread->kernel_bottom);
-    //     	__asm__ __volatile__ (
-		
-				// "mov %1, %%rsp;"
-				
-				// // "pop %%r15;"
-				// // "pop %%r14;"
-				// // "pop %%r13;"
-				// // "pop %%r12;"
-				// // "pop %%r11;"
-				// // "pop %%r10;"
-				// // "pop %%r9;"
-				// // "pop %%r8;"
-				// "pop %%rbp;"
-				// "pop %%rdi;"
-				// "pop %%rsi;"
-				// "pop %%rbx;"
-				// "pop %%rdx;" 
-				// "pop %%rcx;"
-				// "pop %%rax;"
-				
-				// "pop %%rax;"
-				// "mov %%rax, %%rsp;"
 
-				// "mov %%rsp, %0;"
-				// "jmp *%2;"
-
-				// :"=r" ( out )
-				// :"r" (current_uthread->kernel_bottom),
-				// "S" (current_uthread->rip_sch)
-				// );
-        	// printf("\x1B[36m **1** SCHEDULER switch complete! \e[0m\n");
 
         } 
         else if(current_uthread!=NULL && current_uthread->running ){
@@ -373,6 +344,8 @@ void* handler(void* arg) {
 				// "pop %%r10;"
 				// "pop %%r9;"
 				// "pop %%r8;"
+				"pop %%rdi;"
+				"pop %%rsi;"
 				"pop %%rbp;"
 				"pop %%rdi;"
 				"pop %%rsi;"
@@ -389,7 +362,7 @@ void* handler(void* arg) {
 				// "jmp *%%rax;"
 				:"=r" ( out )
 				:"r" (thread_stack_bot),
-				"g" (current_uthread->rip)
+				"S" (current_uthread->rip)
 				);
         	// current_uthread->yield = true;
 			// current_uthread->func(current_uthread->arg);
@@ -405,8 +378,8 @@ void* handler(void* arg) {
 
 void uthread_yield(void)
 {
-	// return;
-th_ret:
+	return;
+
 
 	if(sch_policy == UTHREAD_DIRECT_PTHREAD){
 		printf("yielded the thread, UTHREAD_DIRECT_PTHREAD\n");
@@ -414,110 +387,114 @@ th_ret:
 
 	}
 	else if (sch_policy == UTHREAD_PRIORITY){
-		
-		
-		// current_uthread->yield = false;
-		unsigned long thread_stack_top = (unsigned long)(current_uthread->reg_th) + (unsigned long) (4096);
-		// printf("\x1B[36m @@yield saving regs  \e[0m\n");//current_uthread->sch_rsp);
-		// current_uthread->rsp = save_regs(thread_stack_top);
-		//yielded = true;
-		unsigned long ret;
-		current_uthread->rip = (unsigned long) &&th_ret;
-		// unsigned long jmp_ptr = (unsigned long ) &&lable;
-		// __asm__ __volatile__("lea 0(%%rip), %0" : "=r"(current_uthread->rip));
-		__asm__ __volatile__ (
-		"mov %%rsp, %%r11;"
-		"mov %1, %%rsp;"
-
-		"push %%r11;"
-		"push %%rax;"
-		"push %%rcx;"
-		"push %%rdx;" 
-		"push %%rbx;"
-		"push %%rsi;"
-		"push %%rdi;"
-		"push %%rbp;"
-		// "push %%r8;"
-		// "push %%r9;"
-		// "push %%r10;"
-		// "push %%r11;"
-		// "push %%r12;"
-		// "push %%r13;"
-		// "push %%r14;"
-		// "push %%r15;"
-		// "mov %%rsp, %0;"
-		"mov %%r11, %%rsp;"
-		// "jmp *%2;"
-		:"=r" ( ret )
-		:"r" (thread_stack_top)
-		// "D" (current_uthread->rip_sch)
-		);
-
+		th_ret:
 		if(current_uthread->yield){
 			current_uthread->yield = false;
 			printf("--------@yield return\n");
 			return;
 		}
+		else{
+			// current_uthread->yield = false;
+			unsigned long thread_stack_top = (unsigned long)(current_uthread->reg_th) + (unsigned long) (4096);
+			// printf("\x1B[36m @@yield saving regs  \e[0m\n");//current_uthread->sch_rsp);
+			// current_uthread->rsp = save_regs(thread_stack_top);
+			//yielded = true;
+			unsigned long ret;
+			current_uthread->rip = (unsigned long) &&th_ret;
+			// unsigned long jmp_ptr = (unsigned long ) &&lable;
+			// __asm__ __volatile__("lea 0(%%rip), %0" : "=r"(current_uthread->rip));
+			__asm__ __volatile__ (
+			"mov %%rsp, %%r11;"
+			"mov %1, %%rsp;"
 
-		// printf("yielded the user thread # %lu, pushed at: current_uthread->thread_rsp: %lu\n",(unsigned long) current_uthread->arg,current_uthread->thread_rsp);
-	
-		// if(!current_uthread->yield){
+			"push %%r11;"
+			"push %%rax;"
+			"push %%rcx;"
+			"push %%rdx;" 
+			"push %%rbx;"
+			"push %%rsi;"
+			"push %%rdi;"
+			"push %%rbp;"
+			"push %%rsi;"
+			"push %%rdi;"
+			// "push %%r8;"
+			// "push %%r9;"
+			// "push %%r10;"
+			// "push %%r11;"
+			// "push %%r12;"
+			// "push %%r13;"
+			// "push %%r14;"
+			// "push %%r15;"
+			// "mov %%rsp, %0;"
+			"mov %%r11, %%rsp;"
+			// "jmp *%2;"
+			:"=r" ( ret )
+			:"r" (thread_stack_top),
+			"S" ( current_uthread->rip)
+			);
+// lable:
+			// printf("yielded the user thread # %lu, pushed at: current_uthread->thread_rsp: %lu\n",(unsigned long) current_uthread->arg,current_uthread->thread_rsp);
 		
+			// if(!current_uthread->yield){
+			
 
-			struct Node* pos = ready->peek();
-			struct Node* prev = NULL;
-			bool skip=false;
-			//For priority based scheduling
-			// printf("@yield: current_uthread->priority : %d \n",current_uthread->priority);
-			while(pos!=NULL && pos->val.priority <= current_uthread->priority){
-				if(pos->val.id == current_uthread->id){
-					skip=true;
-					break;
-				} 
-				// printf("@itr:  : %d ",pos->val.priority);
-				prev = pos;
-				pos=pos->next;
-			}
-			// printf("\n");
-			if(!skip) ready->insert(prev, *current_uthread);
+				struct Node* pos = ready->peek();
+				struct Node* prev = NULL;
+				bool skip=false;
+				//For priority based scheduling
+				// printf("@yield: current_uthread->priority : %d \n",current_uthread->priority);
+				while(pos!=NULL && pos->val.priority <= current_uthread->priority){
+					if(pos->val.id == current_uthread->id){
+						skip=true;
+						break;
+					} 
+					// printf("@itr:  : %d ",pos->val.priority);
+					prev = pos;
+					pos=pos->next;
+				}
+				// printf("\n");
+				if(!skip) ready->insert(prev, *current_uthread);
 
-			 // next_uthread = ready->pop();
-			 printf("\x1B[36m @@yield switch to SCHEDULER, from: %lu  \e[0m\n", current_uthread->kernel_bottom);//current_uthread->sch_rsp);
-			 // restore_regs(current_uthread->kernel_bottom);
-			 __asm__ __volatile__ (
-		
-				
-				"mov %1, %%rsp;"
-				
-				// "pop %%r15;"
-				// "pop %%r14;"
-				// "pop %%r13;"
-				// "pop %%r12;"
-				// "pop %%r11;"
-				// "pop %%r10;"
-				// "pop %%r9;"
-				// "pop %%r8;"
-				"pop %%rbp;"
-				"pop %%rdi;"
-				"pop %%rsi;"
-				"pop %%rbx;"
-				"pop %%rdx;" 
-				"pop %%rcx;"
-				"pop %%rax;"
-				
-				"pop %%rax;"
-				"mov %%rax, %%rsp;"
-				
-				"mov %%rsp, %0;"
-				
-				"jmp *%2;"
-				// "ret;"
+				 // next_uthread = ready->pop();
+				 printf("\x1B[36m @@yield switch to SCHEDULER, from: %lu  \e[0m\n", current_uthread->kernel_bottom);//current_uthread->sch_rsp);
+				 // restore_regs(current_uthread->kernel_bottom);
+				 __asm__ __volatile__ (
+			
+					
+					"mov %1, %%rsp;"
+					
+					// "pop %%r15;"
+					// "pop %%r14;"
+					// "pop %%r13;"
+					// "pop %%r12;"
+					// "pop %%r11;"
+					// "pop %%r10;"
+					// "pop %%r9;"
+					// "pop %%r8;"
+					"pop %%rdi;"
+					"pop %%rsi;"
+					"pop %%rbp;"
+					"pop %%rdi;"
+					"pop %%rsi;"
+					"pop %%rbx;"
+					"pop %%rdx;" 
+					"pop %%rcx;"
+					"pop %%rax;"
 
-				:"=r" ( out )
-				:"r" (current_uthread->kernel_bottom),
-				"g" (current_uthread->rip_sch)
-				);
-				
+					
+					"pop %%rax;"
+					"mov %%rax, %%rsp;"
+					
+					"mov %%rsp, %0;"
+					
+					"call *%2;"
+					// "ret;"
+
+					:"=r" ( out )
+					:"r" (current_uthread->kernel_bottom),
+					"S" (current_uthread->rip_sch)
+					);
+				}
 		
 			 // handler(NULL);
 			 printf("yield complete---------jump back to thread\n");
@@ -570,8 +547,6 @@ void uthread_create(void (*func) (void*), void* arg)
 		tinfo.id=turn;
 		tinfo.priority=0;
 		tinfo.func= func;
-
-		tinfo.rip=0;//(unsigned long)func;
 
 		tinfo.arg= (void*) arg;
 		tinfo.running=false;
@@ -753,4 +728,35 @@ void uthread_set_param(int param)
 
 			// next_uthread = ready->pop();
 			
-			
+			        	// restore_regs(current_uthread->kernel_bottom);
+    //     	__asm__ __volatile__ (
+		
+				// "mov %1, %%rsp;"
+				
+				// // "pop %%r15;"
+				// // "pop %%r14;"
+				// // "pop %%r13;"
+				// // "pop %%r12;"
+				// // "pop %%r11;"
+				// // "pop %%r10;"
+				// // "pop %%r9;"
+				// // "pop %%r8;"
+				// "pop %%rbp;"
+				// "pop %%rdi;"
+				// "pop %%rsi;"
+				// "pop %%rbx;"
+				// "pop %%rdx;" 
+				// "pop %%rcx;"
+				// "pop %%rax;"
+				
+				// "pop %%rax;"
+				// "mov %%rax, %%rsp;"
+
+				// "mov %%rsp, %0;"
+				// "jmp *%2;"
+
+				// :"=r" ( out )
+				// :"r" (current_uthread->kernel_bottom),
+				// "S" (current_uthread->rip_sch)
+				// );
+        	// printf("\x1B[36m **1** SCHEDULER switch complete! \e[0m\n");
