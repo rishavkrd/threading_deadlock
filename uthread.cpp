@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include "uthread.h"
 #include <cstdlib>
+#include <unistd.h>
 
 // namespace std {}
 // using std::cout;
@@ -81,6 +82,7 @@ public:
 		if(this->head != NULL){
 			temp5 = &this->head->val;
 			this->head = head->next;
+			// printf("Popped thread #%lu P:%d \n",(unsigned long) temp5->arg, temp5->priority);
 			return temp5;
 		} 
 		
@@ -103,14 +105,18 @@ public:
 	void print_list(){
 		Node* pos = this->head;
 		int count = 0;
-		printf("\n");
+		// printf("\n");
 		while(pos!=NULL){
-			printf("thread #%lu P:%d ",(unsigned long) pos->val.arg, pos->val.priority);
+			printf("thread #%lu P:%d \n",(unsigned long) pos->val.arg, pos->val.priority);
 
 			count++;
 			pos = pos->next;
 		}
-		printf("\n");
+		// printf("\n");
+	}
+	thread_info * seek(){
+		temp5 = &this->head->val;
+		return temp5;
 	}
 
 };
@@ -199,6 +205,7 @@ pthread_t list[1000];
 int index=0;
 int* ret;
 int turn=0;
+int c_switch = 0;
 LinkedList *ready = (LinkedList*) malloc(sizeof(LinkedList));
 uthread_policy sch_policy = UTHREAD_DIRECT_PTHREAD;
 __thread thread_info* current_uthread;
@@ -209,7 +216,7 @@ unsigned long out=0, stack_size=80;
 // int *cleanup = (int*) malloc(sizeof(int*));
 bool cleanup = false;
 
-
+pthread_mutex_t lock;
 
 
 void* handler(void* arg) {
@@ -278,14 +285,24 @@ void* handler(void* arg) {
 	// 			);
 sch_ret:
     while(!cleanup || !ready->isEmpty()) {
+    	__asm__ __volatile__ (
+        		"mov %%rsp, %%r15;"
+        		"mov %%rbp, %%r14;"
+        		:"=r" ( out )		//0
+        		);
     	
 	// printf("sch_bottom: %lu kernel_bottom: %lu, kernel_stack: %lu\n", ret, kernel_bottom, (unsigned long) kernel_stack);
         /* Select a user-space thread from the ready queue */
     	// ready->print_list();
-    	while(ready->isEmpty() && !cleanup) ;
+    	while(ready->isEmpty() && !cleanup);
+
+    	// usleep(10000);
+    	// pthread_mutex_lock(&lock);
         /* Take the thread off the ready queue */
-    	next_uthread = ready->pop();
-    	// printf("next uthread is : %lu\n", (unsigned long)next_uthread->arg);
+         next_uthread = ready->pop();
+    	// else if (current_uthread->priority <= next_uthread->priority) next_uthread = ready->pop();
+
+    	// printf("**** POP ***** next uthread is : %lu\n", (unsigned long)next_uthread);
         /* Run the task of the user-space thread */
         current_uthread = next_uthread;
 
@@ -296,17 +313,18 @@ sch_ret:
         	current_uthread->running = true;
         	current_uthread->kernel_bottom = kernel_bottom;
         	current_uthread->rip_sch = rip_sch;
+        	
         	// __asm__ __volatile__("lea 0(%%rip), %0" : "=r"(current_uthread->rip_sch));
         	unsigned long a = (unsigned long)(current_uthread->stack) + (unsigned long) 4096;
 
-        	printf("\x1B[36m @First switch to THREAD # %lu, from : %lu \e[0m\n", (unsigned long)current_uthread->arg,a);
+        	// printf("\x1B[36m @First switch to THREAD # %lu, from : %lu \e[0m\n", (unsigned long)current_uthread->arg,a);
         	// printf("kernel_bottom: %lu\n", current_uthread->kernel_bottom);
         	// restore_regs(current_uthread->kernel_bottom);
         	// current_uthread->kernel_bottom = save_regs(sch_stack);
-
+        	// pthread_mutex_unlock(&lock);
         	__asm__ __volatile__ (
-        		"mov %%rsp, %%r15;"
-        		"mov %%rbp, %%r14;"
+        		// "mov %%rsp, %%r15;"
+        		// "mov %%rbp, %%r14;"
         		
         		"mov %3, %%rsp\n\t;"
         		"mov %3, %%rbp \n\t;"
@@ -315,22 +333,27 @@ sch_ret:
         		"mov %%r15, %%rsp;"
         		"mov %%r14, %%rbp;"
 
+        		// "jmp *%4;"
+
         		:"=r" ( out )		//0
         		:"r" ( current_uthread->func ),	//1
         		"D" ((unsigned long) current_uthread->arg),	//2
-        		"S" (a)	//3
+        		"S" (a),	//3
+        		"g" ((unsigned long)&&lable)
         		);
         	
         	printf("\x1B[36m **1** First time call complete! \e[0m\n");
+        	// return NULL;
 
 
         } 
-        else if(current_uthread!=NULL && current_uthread->running ){
+        else if(current_uthread!=NULL && current_uthread->running && arg != NULL){
         	//restoring thread's stack for previously yielded thread.
         	// unsigned long addr = (unsigned long) current_uthread->reg_th + (unsigned long) (4096-120);
         	current_uthread->yield = true;
         	unsigned long thread_stack_bot = (unsigned long)(current_uthread->reg_th) + (unsigned long) (4096 - stack_size);
         	printf("\x1B[36m @@@@Running switch to THREAD # %lu, from : %lu \e[0m\n", (unsigned long)current_uthread->arg,thread_stack_bot);
+
         	// restore_regs(current_uthread->rsp);
         	__asm__ __volatile__ (
 		
@@ -366,28 +389,59 @@ sch_ret:
 				);
         	// current_uthread->yield = true;
 			// current_uthread->func(current_uthread->arg);
-        	printf("\x1B[32m restored previously yielded thread's stack succesfully \e[0m\n");
+        	// printf("\x1B[32m restored previously yielded thread's stack succesfully \e[0m\n");
         	
         	// printf("\x1B[32m Called yielded thread \e[0m\n");
         }
         
     }
     // printf("\x1B[32m Exiting Core threads \e[0m\n");
+   lable:
+
     return NULL;
 }
 
 void uthread_yield(void)
 {
+	// c_switch++;
+
 	return;
-
-
 	if(sch_policy == UTHREAD_DIRECT_PTHREAD){
 		printf("yielded the thread, UTHREAD_DIRECT_PTHREAD\n");
 		pthread_yield();
 
 	}
 	else if (sch_policy == UTHREAD_PRIORITY){
+		
+
+		struct Node* pos = ready->peek();
+		struct Node* prev = NULL;
+		bool skip=false;
+		//For priority based scheduling
+		// printf("@yield: current_uthread->priority : %d \n",current_uthread->priority);
+		while(pos!=NULL && pos->val.priority <= current_uthread->priority){
+			if(pos->val.id == current_uthread->id){
+				skip=true;
+				break;
+			} 
+			// printf("@itr:  : %d ",pos->val.priority);
+			prev = pos;
+			pos=pos->next;
+		}
+		// printf("\n");
+		
+
+		if(!skip)ready->insert(prev, *current_uthread);
+		ready->print_list();
+		if(!ready->isEmpty())next_uthread = ready->seek();
+		if(next_uthread!=NULL && current_uthread->priority < next_uthread->priority) return;
+		
+		
+		// if(next_uthread!=NULL)ready->push(*next_uthread);
+				handler(NULL);
+		
 		th_ret:
+		
 		if(current_uthread->yield){
 			current_uthread->yield = false;
 			printf("--------@yield return\n");
@@ -438,22 +492,7 @@ void uthread_yield(void)
 			// if(!current_uthread->yield){
 			
 
-				struct Node* pos = ready->peek();
-				struct Node* prev = NULL;
-				bool skip=false;
-				//For priority based scheduling
-				// printf("@yield: current_uthread->priority : %d \n",current_uthread->priority);
-				while(pos!=NULL && pos->val.priority <= current_uthread->priority){
-					if(pos->val.id == current_uthread->id){
-						skip=true;
-						break;
-					} 
-					// printf("@itr:  : %d ",pos->val.priority);
-					prev = pos;
-					pos=pos->next;
-				}
-				// printf("\n");
-				if(!skip) ready->insert(prev, *current_uthread);
+				
 
 				 // next_uthread = ready->pop();
 				 printf("\x1B[36m @@yield switch to SCHEDULER, from: %lu  \e[0m\n", current_uthread->kernel_bottom);//current_uthread->sch_rsp);
@@ -504,7 +543,7 @@ void uthread_yield(void)
 
 void uthread_set_policy(enum uthread_policy policy){
 	sch_policy = policy;
-	printf("Policy is: %d \n",sch_policy);
+	// printf("Policy is: %d \n",sch_policy);
 	return;
 }
 
@@ -514,7 +553,7 @@ void uthread_init(void)
 	
 	/* Use pthread_create() to create 4 kernel threads which will schedule any user-space thread to run. */
 	if(sch_policy == UTHREAD_PRIORITY){
-		printf("Initializing UTHREAD_PRIORITY \n");
+		// printf("Initializing UTHREAD_PRIORITY \n");
 		for(int i=0;i<4;i++){
 				pthread_create(&t1, NULL,(void* (*) (void*)) handler, NULL);
 				list[index]=t1;
@@ -532,7 +571,7 @@ void uthread_create(void (*func) (void*), void* arg)
 	//void* (*func) (void*) f = &func;
 	if(sch_policy == UTHREAD_DIRECT_PTHREAD){
 		//cout << "UTHREAD_DIRECT_PTHREAD";
-		printf("This is UTHREAD_DIRECT_PTHREAD \n");
+		// printf("This is UTHREAD_DIRECT_PTHREAD \n");
 		pthread_create(&t1, NULL,(void* (*) (void*)) func, (void*) arg);
 		list[index]=t1;
 		index++;
@@ -568,11 +607,12 @@ void uthread_cleanup(void)
 	/* Wait for all 4 pthreads to exit */
 	// cln=1;
 	// *cleanup = 1;
-	printf("Cleanup start \n");
+	// printf("Cleanup start \n");
+	// usleep(1000000);
 	cleanup=true;
 	for(int i=0;i<index;i++)
 		{
-			printf("Cleanup in progress, i: %d \n",i);
+			// printf("Cleanup in progress, i: %d \n",i);
 			pthread_join(list[i],NULL);
 		}
 }
